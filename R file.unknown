@@ -1,0 +1,871 @@
+
+library(dplyr)
+library(dplyr)
+library(lubridate)
+
+# Load necessary libraries
+library(lubridate)
+library(dplyr)
+# Assuming you have the necessary latitude and longitude data for from_area_id and to_area_id
+library(leaflet)
+
+#loading the csv file:
+sarrental<-read.csv("C:/Users/heman/OneDrive/Documents/SAR Rental.csv")
+
+#know the type of data
+str(sarrental)
+
+#summary statistics:
+summary(sarrental)
+###################################################################################################################
+#detailed analysis on each attribute
+
+# user id
+# Count the number of bookings per user
+user_frequency <- table(sarrental$user_id)
+
+# Create a summary table of ride counts
+ride_summary <- as.data.frame(table(user_frequency))
+
+# Rename the columns for better understanding
+colnames(ride_summary) <- c("Number_of_Rides", "Number_of_Users")
+
+# Convert the Number_of_Rides column to numeric for proper sorting
+ride_summary$Number_of_Rides <- as.numeric(as.character(ride_summary$Number_of_Rides))
+
+# Sort the summary by the number of rides (optional)
+ride_summary <- ride_summary[order(ride_summary$Number_of_Rides), ]
+
+# Display the summary
+print(ride_summary)
+
+# Plot the distribution for visualization
+library(ggplot2)
+ggplot(ride_summary, aes(x = Number_of_Rides, y = Number_of_Users)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(title = "Distribution of Number of Rides per User", 
+       x = "Number of Rides", 
+       y = "Number of Users") +
+  theme_minimal()
+
+
+#vehicle model id
+# Count the number of vehicles in each vehicle model category
+vehicle_count <- sarrental %>%
+  group_by(vehicle_model_id) %>%
+  summarise(total_vehicles = n())
+
+# Print the result
+print(vehicle_count)
+
+ggplot(vehicle_count, aes(x = as.factor(vehicle_model_id), y = total_vehicles, fill = as.factor(vehicle_model_id))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Vehicle Count by Model ID", x = "Vehicle Model ID", y = "Total Vehicles") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()  
+
+#travel id:
+# Plot distribution of travel_type_id with count labels
+ggplot(sarrental, aes(x = as.factor(travel_type_id))) + 
+  geom_bar(fill = "lightgreen", color = "black") +
+  geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5) +  # Add count labels above the bars
+  labs(x = "Travel Type ID", y = "Count", title = "Distribution of Travel Type ID") +
+  theme_minimal() +
+  scale_x_discrete(labels = c("1" = "Long Distance", "2" = "Point to Point", "3" = "Hourly Rental")) +  # Custom labels
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+#package id:
+# Plot distribution of package_id including NAs with count labels
+ggplot(sarrental, aes(x = as.factor(package_id))) + 
+  geom_bar(fill = "skyblue", color = "black") +
+  geom_text(stat = 'count', aes(label = ..count..), vjust = -0.5) +  # Add count labels above the bars
+  labs(x = "Package ID", y = "Count", title = "Distribution of Package ID") +
+  theme_minimal() +
+  scale_x_discrete(drop = FALSE) +  # Ensure NA is included as a category
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+#area id
+# Assuming your dataset is named 'sarrental'
+unique_from_area <- length(unique(sarrental$from_area_id))
+unique_to_area <- length(unique(sarrental$to_area_id))
+
+# Print the results
+cat("Unique From Area IDs:", unique_from_area, "\n")
+cat("Unique To Area IDs:", unique_to_area, "\n")
+
+
+#city id 
+
+# Assuming your dataset is named 'sarrental'
+unique_from_city <- length(unique(sarrental$from_city_id))
+unique_to_city <- length(unique(sarrental$to_city_id))
+
+# Print the results
+cat("Unique From city IDs:", unique_from_city, "\n")
+cat("Unique To city IDs:", unique_to_city, "\n")
+
+
+#to_date and from_date
+# Ensure from_date is treated as character before conversion
+sarrental$from_date <- as.character(sarrental$from_date)
+
+# Convert to datetime format
+sarrental$from_date <- mdy_hm(sarrental$from_date)
+
+# Check if conversion was successful
+print(head(sarrental$from_date))
+
+# ====== Hourly Analysis ======
+sarrental$from_hour <- hour(sarrental$from_date)
+
+# Check if the extraction worked
+print(table(sarrental$from_hour))
+
+# Count trips per hour
+hourly_counts <- table(sarrental$from_hour)
+
+# Convert to dataframe
+hourly_df <- as.data.frame(hourly_counts)
+
+# Ensure correct column names
+colnames(hourly_df) <- c("Hour", "Count")
+
+# Verify structure
+print(head(hourly_df))
+
+# ====== Monthly Analysis ======
+# Extract month (first day of each month)
+sarrental$from_month <- floor_date(sarrental$from_date, "month")
+
+# Count trips per month
+monthly_counts <- as.data.frame(table(sarrental$from_month))
+
+# Ensure correct column names
+colnames(monthly_counts) <- c("Month", "Count")
+
+# Convert Month to Date format
+monthly_counts$Month <- as.Date(monthly_counts$Month)
+
+# Verify structure
+print(head(monthly_counts))
+
+
+
+
+# Plot Monthly Distribution
+ggplot(monthly_counts, aes(x = Month, y = Count)) +
+  geom_line(group = 1, color = "blue", size = 1) +  # Line graph for trend
+  geom_point(size = 3, color = "red") +  # Markers for better visibility
+  labs(title = "Trips Distribution by Month",
+       x = "Month",
+       y = "Number of Trips") +
+  theme_minimal() +
+  scale_x_date(date_labels = "%b %Y", date_breaks = "1 month") +  # Format x-axis labels
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate labels for clarity
+
+
+
+
+#count of unique area ids
+# Aggregating counts for each area (from_area_id and to_area_id)
+from_area_count <- sarrental %>%
+  group_by(from_area_id) %>%
+  summarise(count = n())
+
+to_area_count <- sarrental%>%
+  group_by(to_area_id) %>%
+  summarise(count = n())
+
+from_area_count
+to_area_count
+
+
+# Count missing values in from_area_id and to_area_id
+from_area_missing <- sum(is.na(sarrental$from_area_id))
+to_area_missing <- sum(is.na(sarrental$to_area_id))
+
+# Print the results
+from_area_missing
+to_area_missing
+
+
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Create a new column to represent travel types
+missing_data_all_types <- sarrental %>%
+  mutate(travel_type = case_when(
+    travel_type_id == 2 ~ "Point-to-Point",
+    travel_type_id == 1 ~ "Hourly",
+    travel_type_id == 3 ~ "Long Distance",
+    TRUE ~ "Other"
+  )) %>%
+  # Create a data frame to show missing vs. non-missing counts for each column and travel type
+  gather(key = "column", value = "value", from_area_id, to_area_id) %>%
+  group_by(travel_type, column) %>%
+  summarise(
+    missing = sum(is.na(value)),
+    non_missing = sum(!is.na(value))
+  ) %>%
+  pivot_longer(cols = c('missing', 'non_missing'), names_to = 'status', values_to = 'count')
+
+# Plot the missing vs. non-missing counts for both area columns across all travel types
+ggplot(missing_data_all_types, aes(x = travel_type, y = count, fill = status)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  facet_wrap(~ column) +
+  labs(title = 'Missing vs. Non-Missing Values in Area IDs Across Travel Types',
+       x = 'Travel Type',
+       y = 'Count') +
+  theme_minimal()
+
+# Group by hour to count trips
+hourly_bookings <- sarrental %>%
+  group_by(from_hour) %>%
+  summarise(trip_count = n(), .groups = 'drop')
+
+# Plot with counts labeled above each bar
+ggplot(hourly_bookings, aes(x = from_hour, y = trip_count)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "white") +
+  geom_text(aes(label = trip_count), vjust = -0.5, size = 3.5) +  # Add count labels above bars
+  labs(title = "Trips Distribution by Hour of the Day",
+       x = "Hour of the Day",
+       y = "Number of Trips") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, 23, 1))  # Show 0–23 on x-axis
+
+
+
+#booking created
+
+# Convert 'Booking Created' to datetime format
+sarrental$booking_created <- mdy_hm(sarrental$booking_created)
+
+#extract date from booking_created
+sarrental$booking_month <- floor_date(sarrental$booking_created, "month")
+# Extract hour from 'Booking Created'
+sarrental$booking_hour <- hour(sarrental$booking_created)
+
+
+# Summarize bookings by hour of the day
+hourly_bookings <- sarrental %>%
+  group_by(booking_hour) %>%
+  summarise(bookings_count = n())
+
+# Plot bookings distribution by hour
+ggplot(hourly_bookings, aes(x = booking_hour, y = bookings_count)) +
+  geom_bar(stat = "identity", fill = "steelblue", color = "white") +
+  labs(title = "Bookings Distribution by Hour of the Day",
+       x = "Hour of the Day",
+       y = "Number of Bookings") +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, 23, 1))  # Ensure 24 hours
+
+print(hourly_bookings)
+# Print all rows of hourly_bookings
+print(hourly_bookings, n = 24)
+
+
+# online booking and mobile site booking
+
+# Count of bookings
+table(sarrental$online_booking)
+table(sarrental$mobile_site_booking)
+
+# Count of online bookings and mobile bookings
+online_mobile_matrix <- table(sarrental$online_booking, sarrental$mobile_site_booking)
+
+# Display the result as a matrix
+online_mobile_matrix
+
+# Add the 'In Person' booking column based on conditions
+sarrental$in_person_booking <- ifelse(sarrental$online_booking == 0 & sarrental$mobile_site_booking == 0, 1, 0)
+
+# Verify the new column has been added
+table(sarrental$in_person_booking)
+
+# Create a summary table for the booking types
+data <- data.frame(
+  Booking_Type = factor(c("Mobile Booking", "Online Booking", "In Person"), 
+                        levels = c("Mobile Booking", "Online Booking", "In Person")),
+  Count = c(sum(sarrental$mobile_site_booking == 1), 
+            sum(sarrental$online_booking == 1), 
+            sum(sarrental$in_person_booking == 1)),
+  Booking_Channel = c("Mobile", "Online", "In Person")
+)
+
+# Check the updated data frame
+print(data)
+
+# Create a bar plot for visualization with the added In Person booking
+ggplot(data, aes(x = Booking_Type, y = Count, fill = Booking_Channel)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Booking Type Distribution", x = "Booking Type", y = "Count") +
+  theme_minimal()
+
+
+#longitude and latitude:
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+
+# Create a new column to represent travel types
+missing_data_all_types <- sarrental %>%
+  mutate(travel_type = case_when(
+    travel_type_id == 2 ~ "Point-to-Point",
+    travel_type_id == 1 ~ "Hourly",
+    travel_type_id == 3 ~ "Long Distance",
+    TRUE ~ "Other"
+  )) %>%
+  # Gather the columns to be analyzed (from_lat, from_long, to_lat, to_long)
+  gather(key = "column", value = "value",  from_lat, from_long, to_lat, to_long) %>%
+  group_by(travel_type, column) %>%
+  summarise(
+    missing = sum(is.na(value)),
+    non_missing = sum(!is.na(value))
+  ) %>%
+  pivot_longer(cols = c('missing', 'non_missing'), names_to = 'status', values_to = 'count')
+
+# Plot the missing vs. non-missing counts for the specified columns across all travel types
+ggplot(missing_data_all_types, aes(x = travel_type, y = count, fill = status)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  facet_wrap(~ column) +  # Faceting by column (area and lat-long columns)
+  labs(title = 'Missing vs. Non-Missing Values Lat-Long Columns Across Travel Types',
+       x = 'Travel Type',
+       y = 'Count') +
+  theme_minimal()
+
+# Install the geosphere package if not already installed
+
+#install.packages("geosphere")
+
+  point_to_point_data <- sarrental %>% 
+  filter(travel_type_id == 2)
+library(geosphere)
+#calculated distances only to point to point dataset
+# Replace with actual column names
+point_to_point_data$distances <- distHaversine(
+  cbind(as.numeric(point_to_point_data$from_long), as.numeric(point_to_point_data$from_lat)),
+  cbind(as.numeric(point_to_point_data$to_long), as.numeric(point_to_point_data$to_lat))
+) / 1000  # Convert meters to kilometers
+
+# Check calculated distances
+point_to_point_data$distances
+
+
+# Categorize distances
+point_to_point_data$distance_category <- cut(
+  point_to_point_data$distances,
+  breaks = c(0, 5, 10, 20, 50, 100, Inf), # Define distance ranges (in km)
+  labels = c("0-5 km", "5-10 km", "10-20 km", "20-50 km", "50-100 km", "100+ km"),
+  right = FALSE
+)
+
+# Check the categorized data
+table(point_to_point_data$distance_category)
+
+
+# Plot the distribution of distances
+ggplot(point_to_point_data, aes(x = distances)) +
+  geom_histogram(binwidth = 1, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Distances (in km)", x = "Distance (km)", y = "Frequency") +
+  theme_minimal()
+
+# Alternatively, a density plot can also be used to visualize the distribution
+ggplot(point_to_point_data, aes(x = distances)) +
+  geom_density(fill = "blue", alpha = 0.7) +
+  labs(title = "Density Plot of Distances (in km)", x = "Distance (km)", y = "Density") +
+  theme_minimal()
+
+# Bar chart with count labels on top
+ggplot(point_to_point_data, aes(x = distance_category)) +
+  geom_bar(fill = "steelblue", color = "white") +
+  geom_text(stat = "count", aes(label = ..count..), vjust = -0.5, size = 3.5) + # Adding count labels
+  labs(
+    title = "Distribution of Trips by Distance Category",
+    x = "Distance Category",
+    y = "Number of Trips"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))  # Rotate x-axis labels for better readability
+
+
+#car cancellation
+
+# Visualization of Car Cancellation with counts on top of bars
+ggplot(sarrental, aes(x = factor(Car_Cancellation))) +
+  geom_bar(fill = "steelblue", color = "white") +
+  geom_text(
+    aes(label = ..count..), 
+    stat = "count", 
+    vjust = -0.5,   # Adjust the vertical position of the count text
+    color = "black"
+  ) +
+  labs(
+    title = "Car Cancellation Distribution",
+    x = "Car Cancellation",
+    y = "Count of Trips"
+  ) +
+  scale_x_discrete(labels = c("No Cancellation", "Cancellation")) +
+  theme_minimal()
+
+#######################################################################################################################################
+
+#checking zeros
+
+# Count of zeros in each column
+zero_counts <- sapply(sarrental, function(x) sum(x == 0, na.rm = TRUE))
+print(zero_counts)
+
+##########################################################################################################
+
+#checking null values
+# Loop through all character columns and replace empty strings with NA
+sarrental[sapply(sarrental, is.character)] <- lapply(sarrental[sapply(sarrental, is.character)], function(x) {
+  x[x == ""] <- NA
+  return(x)
+})
+
+
+colSums(is.na(sarrental))
+
+library(mice)
+
+md.pattern(sarrental, rotate.names=TRUE)
+
+summary(sarrental)
+str(sarrental)
+
+############################################################################################################################
+#transferring all data into new variable (only travel_id= 2)
+str(sarrental)
+# Filter rows where travel_type_id is 2
+cateogry2_data<- sarrental[sarrental$travel_type_id == 2, ]
+
+
+# Check the first few rows of the filtered data
+head(cateogry2_data)
+
+
+library(mice)
+md.pattern(cateogry2_data, rotate.names=TRUE)
+
+
+#tranferiing all the data into new variable (travel id 1 and 3)
+# Filter rows where travel_type_id is 1 and 3 
+cateogry13_data<- sarrental[sarrental$travel_type_id  != 2, ]
+md.pattern(cateogry13_data, rotate.names=TRUE)
+
+# Check the first few rows of the filtered data
+head(cateogry13_data)
+
+##############################################################################################################
+#handling of missing data 
+#dropping the columns in point to point data
+# Drop the specified columns
+cateogry2_data <- cateogry2_data [, !(colnames(cateogry2_data) %in% c("to_date", "from_city_id", "to_city_id", "package_id"))]
+
+# Check the first few rows of the cateogry_2 data
+head(cateogry2_data)
+
+#####################################################################################################################################
+#data transformation
+#before in the eda process the distance travelled is already derived but to avoid confusion i did not stored in the separate column
+#including distances column into the cateogory_2 from the lattitude an dlongitude columns
+library(geosphere)
+
+# Calculate the distance for each row and store it in the 'distance_travelled' column
+cateogry2_data$distance_travelled <- apply(cateogry2_data, 1, function(row) {
+  from_coords <- c(as.numeric(row["from_long"]), as.numeric(row["from_lat"]))
+  to_coords <- c(as.numeric(row["to_long"]), as.numeric(row["to_lat"]))
+  distHaversine(from_coords, to_coords) / 1000  # Convert meters to kilometers
+})
+
+# Check the updated dataset
+head(cateogry2_data)
+
+str(cateogry2_data)
+
+###################################################################################################################
+
+#################################################################################################################
+#predictor relavancy 
+#continous variable
+t_test_result <- t.test(distance_travelled ~ Car_Cancellation, data = cateogry2_data, var.equal = FALSE)
+
+t_test_result
+
+# Load necessary libraries
+  library(dplyr)
+
+# Calculate the cancellation rate for each vehicle model
+vehicle_cancel_rate <- sarrental %>%
+  group_by(vehicle_model_id) %>%
+  summarise(cancel_rate = mean(Car_Cancellation))
+
+# Print the result
+print(vehicle_cancel_rate)
+# Load necessary libraries
+library(ggplot2)
+
+# Plot the cancellation rate by vehicle model
+ggplot(vehicle_cancel_rate, aes(x = as.factor(vehicle_model_id), y = cancel_rate, fill = as.factor(vehicle_model_id))) +
+  geom_bar(stat = "identity") +
+  labs(title = "Car Cancellation Rate by Vehicle Model", x = "Vehicle Model ID", y = "Cancellation Rate") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  coord_flip()
+
+
+# Calculate cancellation rate by 'from_area_id'
+from_area_cancel_rate <- sarrental %>%
+  group_by(from_area_id) %>%
+  summarise(cancel_rate = mean(Car_Cancellation))
+
+# Calculate cancellation rate by 'to_area_id'
+to_area_cancel_rate <- sarrental %>%
+  group_by(to_area_id) %>%
+  summarise(cancel_rate = mean(Car_Cancellation))
+
+# Print the results
+print(from_area_cancel_rate)
+print(to_area_cancel_rate)
+
+library(ggplot2)
+library(dplyr)
+
+# Calculate the cancellation rate based on online_booking and mobile_site_booking
+booking_cancel_rate <- cateogry2_data %>%
+  group_by(online_booking, mobile_site_booking, in_person_booking) %>%
+  summarise(cancel_rate = mean(Car_Cancellation))
+
+# Visualization for online_booking vs. car cancellations
+ggplot(booking_cancel_rate, aes(x = factor(online_booking), y = cancel_rate, fill = factor(online_booking))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Cancellation Rate for Online Booking",
+       x = "Online Booking (0 = No, 1 = Yes)",
+       y = "Cancellation Rate") +
+  scale_fill_manual(values = c("red", "blue")) +
+  theme_minimal()
+
+# Visualization for mobile_site_booking vs. car cancellations
+ggplot(booking_cancel_rate, aes(x = factor(mobile_site_booking), y = cancel_rate, fill = factor(mobile_site_booking))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Cancellation Rate for Mobile Site Booking",
+       x = "Mobile Site Booking (0 = No, 1 = Yes)",
+       y = "Cancellation Rate") +
+  scale_fill_manual(values = c("purple", "green")) +
+  theme_minimal()
+
+# Visualization for in-person vs. car cancellations
+ggplot(booking_cancel_rate, aes(x = factor(in_person_booking), y = cancel_rate, fill = factor(in_person_booking))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Cancellation Rate for in-person Booking",
+       x = "Mobile Site Booking (0 = No, 1 = Yes)",
+       y = "Cancellation Rate") +
+  scale_fill_manual(values = c("purple", "green")) +
+  theme_minimal()
+print(booking_cancel_rate)
+
+
+str(cateogry2_data)
+
+
+library(dplyr)
+library(ggplot2)
+
+# Calculate cancellation rate for each 'from_hour'
+from_time_cancel_rate <- cateogry2_data %>%
+  group_by(from_hour) %>%
+  summarise(cancel_rate = mean(Car_Cancellation, na.rm = TRUE))  # Fixed calculation
+
+# Plot cancellation rate by 'from_hour'
+ggplot(from_time_cancel_rate, aes(x = as.factor(from_hour), y = cancel_rate)) +  # Ensure categorical x-axis
+  geom_col(fill = "steelblue") +  # Use geom_col() instead of geom_bar()
+  theme_minimal() +
+  labs(title = "Cancellation Rate by From Time",
+       x = "From Time",
+       y = "Cancellation Rate") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Calculate cancellation rate for each 'booking_time'
+booking_time_cancel_rate <- cateogry2_data %>%
+  group_by(booking_hour) %>%
+  summarise(cancel_rate = mean(Car_Cancellation, na.rm = TRUE))  # Fixed calculation
+
+# Plot cancellation rate by 'booking_time'
+ggplot(booking_time_cancel_rate, aes(x = as.factor(booking_hour), y = cancel_rate)) +
+  geom_col(fill = "orange") +
+  theme_minimal() +
+  labs(title = "Cancellation Rate by Booking Time",
+       x = "Booking Time",
+       y = "Cancellation Rate") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+# Print all rows of the data frames
+print(from_time_cancel_rate, n = Inf)
+print(booking_time_cancel_rate, n = Inf)
+
+library(ggplot2)
+library(dplyr)
+
+# Calculate cancellation rates for booking_time_month
+booking_time_month_cancel_rate <- cateogry2_data %>%
+  group_by(booking_month) %>%
+  summarise(cancel_rate = mean(as.numeric(as.character(Car_Cancellation))))
+
+# Calculate cancellation rates for from_data_month
+from_data_month_cancel_rate <- cateogry2_data %>%
+  group_by(from_month) %>%
+  summarise(cancel_rate = mean(as.numeric(as.character(Car_Cancellation))))
+
+library(ggplot2)
+
+# Plot for booking_time_month vs cancellation rate
+ggplot(booking_time_month_cancel_rate, aes(x = as.factor(booking_month), y = cancel_rate, fill = as.factor(booking_month))) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Cancellation Rate by Booking Time Month", 
+       x = "Month", 
+       y = "Cancellation Rate") +
+  scale_x_discrete(labels = 1:12)  # Show only month numbers (1-12)
+
+# Plot for from_data_month vs cancellation rate
+ggplot(from_data_month_cancel_rate, aes(x = as.factor(from_month), y = cancel_rate, fill = as.factor(from_month))) +
+  geom_col() +
+  theme_minimal() +
+  labs(title = "Cancellation Rate by From Date Month", 
+       x = "Month", 
+       y = "Cancellation Rate") +
+  scale_x_discrete(labels = 1:12)  # Show only month numbers (1-12)
+
+
+print(booking_time_month_cancel_rate, n=Inf)
+print(from_data_month_cancel_rate)
+
+#####################################################################################################################
+#dimension reduction
+str(cateogry2_data)
+
+# Remove row_id column
+cateogry2_data$row. <- NULL
+
+#remove user id
+cateogry2_data$user_id  <- NULL
+
+# Remove the original from_date column
+cateogry2_data$from_date <- NULL
+
+cateogry2_data$travel_type_id<- NULL
+
+cateogry2_data$from_area_id <- NULL
+cateogry2_data$to_area_id <- NULL
+
+
+# Drop the latitude and longitude columns
+cateogry2_data <- cateogry2_data[, !(colnames(cateogry2_data) %in% c("from_lat", "from_long", "to_lat", "to_long"))]
+
+# Remove the original booking_created column
+cateogry2_data$booking_created <- NULL
+
+#Removing the from_date:
+cateogry2_data$from_date <- NULL
+
+# Convert whole date columns that is from_month and booking_month to month 
+cateogry2_data$from_month <- month(cateogry2_data$from_month)
+cateogry2_data$booking_month <- month(cateogry2_data$booking_month)
+
+# Check the changes
+head(cateogry2_data[c("from_month", "booking_month")])
+
+##############################################################################################################
+#corelation
+# Load necessary libraries
+library(ggcorrplot)
+library(corrplot)
+
+# Check structure and summary of the dataset
+str(cateogry2_data)
+summary(cateogry2_data)
+
+# Select only numeric columns
+numeric_data <- cateogry2_data[, sapply(cateogry2_data, is.numeric)]
+
+# Compute correlation matrix
+corr_matrix <- cor(numeric_data, use = "pairwise.complete.obs")
+
+# Print correlation matrix
+print(corr_matrix)
+
+# Visualize correlation matrix
+ggcorrplot(corr_matrix, lab = TRUE, colors = c("blue", "white", "red"))
+
+#removing columns
+cateogry2_data$from_month <- NULL
+cateogry2_data$in_person_booking <- NULL
+################################################################################################
+
+str(cateogry2_data)
+summary(cateogry2_data)
+
+#doing factors
+# Convert selected variables to factors
+cateogry2_data$vehicle_model_id <- as.factor(cateogry2_data$vehicle_model_id)
+cateogry2_data$online_booking <- as.factor(cateogry2_data$online_booking)
+cateogry2_data$mobile_site_booking <- as.factor(cateogry2_data$mobile_site_booking)
+cateogry2_data$Car_Cancellation <- as.factor(cateogry2_data$Car_Cancellation)
+cateogry2_data$from_hour <- as.factor(cateogry2_data$from_hour)
+cateogry2_data$booking_month <- as.factor(cateogry2_data$booking_month)
+cateogry2_data$booking_hour <- as.factor(cateogry2_data$booking_hour)
+# Check structure to confirm changes
+str(cateogry2_data)
+
+summary(cateogry2_data)
+
+#partiticateogry2_data#partition of data
+library(caret)
+
+
+# Set the seed for reproducibility
+set.seed(123)
+
+# Create training indices (70% of the data)
+train_index <- createDataPartition(cateogry2_data$Car_Cancellation, p = 0.7, list = FALSE)
+train_data <- cateogry2_data[train_index, ]
+
+# Remaining 30% of the data
+remaining_data <- cateogry2_data[-train_index, ]
+
+# Split the remaining data into validation and testing sets (each 15% of the original data)
+validation_index <- createDataPartition(remaining_data$Car_Cancellation, p = 0.5, list = FALSE)
+test_data <- remaining_data[validation_index, ]
+validation_data <- remaining_data[-validation_index, ]
+
+
+cat("Dimensions of Training Set: ", dim(train_data), "\n")
+cat("Dimensions of Validation Set: ", dim(validation_data), "\n")
+cat("Dimensions of Testing Set: ", dim(test_data), "\n")
+
+
+train_cancellation_proportion <- mean(train_data$Car_Cancellation == 1) * 100
+validation_cancellation_proportion <- mean(validation_data$Car_Cancellation == 1) * 100
+test_cancellation_proportion <- mean(test_data$Car_Cancellation == 1) * 100
+
+cat("Proportion of Car Cancellations in Training Set: ", train_cancellation_proportion, "%\n")
+cat("Proportion of Car Cancellations in Validation Set: ", validation_cancellation_proportion, "%\n")
+cat("Proportion of Car Cancellations in Testing Set: ", test_cancellation_proportion, "%\n")
+########################################################################################################################
+# Load necessary libraries
+
+
+library(rpart)    # For decision tree
+library(rpart.plot)  # For better visualization
+
+# Ensure the target variable is a factor
+train_data$Car_Cancellation <- as.factor(train_data$Car_Cancellation)
+
+# Perform upsampling
+set.seed(123)  # For reproducibility
+train_data_upsampled <- upSample(x = train_data[, !names(train_data) %in% "Car_Cancellation"],  
+                                 y = train_data$Car_Cancellation)
+
+# Rename the target variable column
+colnames(train_data_upsampled)[colnames(train_data_upsampled) == "Class"] <- "Car_Cancellation"
+
+# Check class distribution after upsampling
+table(train_data_upsampled$Car_Cancellation)
+######################################################################################################################
+# Train decision tree model on upsampled data
+tree_model <- rpart(Car_Cancellation ~ ., data = train_data_upsampled, method = "class")
+
+# Plot the decision tree
+rpart.plot(tree_model, type = 3,cex = 0.5, extra = 104, fallen.leaves = TRUE, 
+           main = "Decision Tree for Car Cancellation")
+
+# Make predictions on the test dataset
+predictions <- predict(tree_model, validation_data, type = "class")
+
+# Create confusion matrix
+confusion_matrix <- table(Predicted = predictions, Actual = validation_data$Car_Cancellation)
+print(confusion_matrix)
+
+# Evaluate model performance
+conf_matrix <- confusionMatrix(as.factor(predictions), as.factor(validation_data$Car_Cancellation), positive = "1")
+print(conf_matrix)
+
+#########################################################################################################
+
+model <- glm(Car_Cancellation ~ ., data = train_data_upsampled, family = binomial, control = glm.control(maxit = 100))
+
+
+# Model summary
+summary(model)
+
+
+# Predict probabilities for the test set
+predicted_probs <- predict(model, newdata = validation_data, type = "response")
+
+# Predict the classes (0 or 1) based on a threshold of 0.5
+predicted_classes <- ifelse(predicted_probs >= 0.5, 1, 0)
+
+
+confusion_matrix <- table(Predicted = predicted_classes, Actual = validation_data$Car_Cancellation)
+print(confusion_matrix)
+
+confusionMatrix(as.factor(predicted_classes), as.factor(validation_data$Car_Cancellation), positive = "1")
+
+###############################################################################################################
+
+# Load ranger package
+library(ranger)
+
+# Train the random forest model with ranger
+rf_model_ranger <- ranger(Car_Cancellation ~ . , data = train_data_upsampled, num.trees = 100)
+
+# View model summary
+print(rf_model_ranger)
+
+
+# Assuming you have a test dataset called 'test_data'
+# Predict using the trained ranger random forest model
+predictions_ranger <- predict(rf_model_ranger, data = validation_data)$predictions
+
+
+
+# Create confusion matrix
+confusion_matrix <- table(Predicted = predictions_ranger, Actual = validation_data$Car_Cancellation)
+confusion_matrix
+
+confusionMatrix(as.factor(predictions_ranger), as.factor(validation_data$Car_Cancellation), positive = "1")
+
+
+
+############################################################################################################
+
+
+
+#########################################################################################################
+
+#model improvement 
+#i want to decrease the threshold to 0.4
+
+# Model summary
+summary(model)
+
+# Predict probabilities for the test set
+predicted_probs <- predict(model, newdata = test_data, type = "response")
+
+# Predict the classes (0 or 1) based on a threshold of 0.4
+predicted_classes <- ifelse(predicted_probs >= 0.4, 1, 0)
+
+confusion_matrix <- table(Predicted = predicted_classes, Actual = test_data$Car_Cancellation)
+print(confusion_matrix)
+
+confusionMatrix(as.factor(predicted_classes), as.factor(test_data$Car_Cancellation), positive = "1")
+
+#####################################################################################################################
